@@ -85,6 +85,5 @@ Put your PDF file(s) into the `documents/` folder.
 
 ---
 
-## 📝 License
+Base on : ( https://github.com/dhirajpatra/simple-rag-ollama )
 
-MIT
