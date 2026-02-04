@@ -1,21 +1,20 @@
 # File: backend/main.py
 
-import os
-import fitz  # PyMuPDF
+import os# làm việc với file, folder
+import fitz  # PyMuPDF , đọc nội dung PDF
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
-from langchain_community.llms import Ollama
+from langchain_community.llms import Ollama # gọi AI local (LLM) để trả lời
 # from langchain_community.embeddings import OllamaEmbeddings
-from langchain_ollama import OllamaEmbeddings
-from utils import get_pdf_chunks, cosine_similarity
-
+from langchain_ollama import OllamaEmbeddings # biến text thành vector (để search giống nhau)
+from utils import get_pdf_chunks, cosine_similarity # đo độ giống nhau giữa câu hỏi và từng đoạn PDF
+# Đây là “đồ nghề”: đọc PDF, biến chữ thành vector, gọi AI trả lời.
 # Set base URL for Ollama from environment variable
-OLLAMA_API_URL = os.getenv('OLLAMA_API_URL', 'http://ollama:11434')
+OLLAMA_API_URL = os.getenv('OLLAMA_API_URL', 'http://ollama:11434') # địa chỉ con Ollama server đang chạy trong Docker
+EMBEDDING_MODEL = 'hf.co/CompendiumLabs/bge-base-en-v1.5-gguf' # model dùng để vector hoá PDF
+LANGUAGE_MODEL = 'hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF' # model dùng để trả lời câu hỏi
 
-EMBEDDING_MODEL = 'hf.co/CompendiumLabs/bge-base-en-v1.5-gguf'
-LANGUAGE_MODEL = 'hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF'
-
-# LangChain LLM and embedding clients
+# LangChain LLM and embedding clients, Khởi tạo AI (LLM) và Embedding
 llm = Ollama(
     model=LANGUAGE_MODEL,
     base_url=OLLAMA_API_URL,
@@ -29,19 +28,21 @@ embedding_client = OllamaEmbeddings(
     model=EMBEDDING_MODEL,
     base_url=OLLAMA_API_URL
 )
-
+# VECTOR_DB – “database tự chế”,  Đây là database trong RAM
 VECTOR_DB = []
 
-def embed_text(text):
+def embed_text(text): # “Biến chữ thành toán học để so sánh giống nhau.”
     return embedding_client.embed_query(text)
 
 def add_chunk_to_database(chunk):
     embedding = embed_text(chunk)
-    VECTOR_DB.append((chunk, embedding))
+    VECTOR_DB.append((chunk, embedding))  # Lưu vào VECTOR_DB
+#Tắt server là mất hết
+#Mỗi lần restart lại phải đọc PDF lại từ đầu
 
 def ingest_pdfs(folder_path='documents'):
     if VECTOR_DB:
-        print("[INFO] VECTOR_DB already populated.")
+        print("[INFO] VECTOR_DB already populated.")    # Nếu DB đã có dữ liệu thì không đọc lại PDF nữa
         return
     for filename in os.listdir(folder_path):
         print(f"[DEBUG] Processing file: {filename}")
@@ -52,8 +53,8 @@ def ingest_pdfs(folder_path='documents'):
             for chunk in chunks:
                 print(f"[DEBUG] Adding chunk: {chunk[:80]}...")
                 add_chunk_to_database(chunk)
-
-def retrieve(query, top_n=3):
+# 47-55 “Cho AI đọc tài liệu trước khi hỏi.”
+def retrieve(query, top_n=3): # Retrieve – tìm đoạn PDF liên quan nhất, Biến câu hỏi thành vector.
     query_embedding = embed_text(query)
     similarities = []
     for chunk, embedding in VECTOR_DB:
