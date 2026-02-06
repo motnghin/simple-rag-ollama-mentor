@@ -24,7 +24,7 @@ llm = Ollama(
     num_predict=512
 )
 
-embedding_client = OllamaEmbeddings(
+embedding_client = OllamaEmbeddings(# 1 model trả lời , 1 model biến text → vector
     model=EMBEDDING_MODEL,
     base_url=OLLAMA_API_URL
 )
@@ -36,11 +36,11 @@ def embed_text(text): # “Biến chữ thành toán học để so sánh giốn
 
 def add_chunk_to_database(chunk):
     embedding = embed_text(chunk)
-    VECTOR_DB.append((chunk, embedding))  # Lưu vào VECTOR_DB
+    VECTOR_DB.append((chunk,     embedding))  # Lưu vào VECTOR_DB
 #Tắt server là mất hết
 #Mỗi lần restart lại phải đọc PDF lại từ đầu
 
-def ingest_pdfs(folder_path='documents'):
+def ingest_pdfs(folder_path='documents'): # < Đọc PDF và chia nhỏ>
     if VECTOR_DB:
         print("[INFO] VECTOR_DB already populated.")    # Nếu DB đã có dữ liệu thì không đọc lại PDF nữa
         return
@@ -59,22 +59,22 @@ def retrieve(query, top_n=3): # Retrieve – tìm đoạn PDF liên quan nhất,
     similarities = []
     for chunk, embedding in VECTOR_DB:
         similarity = cosine_similarity(query_embedding, embedding)
-        similarities.append((chunk, similarity))
-    similarities.sort(key=lambda x: x[1], reverse=True)
+        similarities.append((chunk, similarity)) # 59-62 , So câu hỏi với từng đoạn PDF → tính điểm giống nhau.
+    similarities.sort(key=lambda x: x[1], reverse=True) #  Sắp xếp: đoạn nào giống nhất thì lên đầu.
     
     print(f"[INFO] Top {top_n} matches for query '{query}':")
-    for chunk, score in similarities[:top_n]:
+    for chunk, score in similarities[:top_n]: # 
         print(f"  [SCORE: {score:.4f}] {chunk[:100]}")
     
-    return similarities[:top_n]
+    return similarities[:top_n] # Lấy top N đoạn liên quan nhất. , Đây chính là Retrieval trong RAG.
 
-def process_query(user_input):
-    ingest_pdfs()
+def process_query(user_input): # Đảm bảo PDF đã được load vào VECTOR_DB.
+    ingest_pdfs() # process_query – trái tim của RAG
 
-    retrieved_knowledge = retrieve(user_input, top_n=6)
+    retrieved_knowledge = retrieve(user_input, top_n=6)# Lấy 6 đoạn PDF liên quan nhất tới câu hỏi.
 
     context = "\n\n".join(
-        [f"[SOURCE {i+1}]\n{chunk}" for i, (chunk, _) in enumerate(retrieved_knowledge)]
+        [f"[SOURCE {i+1}]\n{chunk}" for i, (chunk, _) in enumerate(retrieved_knowledge)] # Ghép các đoạn PDF lại thành context cho AI đọc.
     )
 
     prompt = f"""
@@ -97,6 +97,6 @@ Answer:
 - Quote or paraphrase relevant articles if applicable
 - Be concise and accurate
 """
-
+# Ép AI chỉ được dùng PDF, 
     return llm.invoke(prompt)
 
